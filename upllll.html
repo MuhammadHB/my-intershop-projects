@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Image Uploader by muhammad </title>
+  <style>
+    body{
+      /* Animation background */
+      background: linear-gradient(-45deg, #ffe3ab, #ffc400, #ff6c6c, #b4b4b4);
+      background-size: 400% 400%;
+      animation: gradient 10s ease infinite;
+      height: 100vh;
+    }
+  
+    @keyframes gradient {
+      0% {
+        background-position: 0% 50%;
+      }
+      50% {
+        background-position: 100% 50%;
+      }
+      100% {
+        background-position: 0% 50%;
+      }
+    }
+    .container {
+      text-align: center;
+      margin-top: 50px;
+    }
+    .image-preview {
+      max-width: 300px;
+      margin-top: 20px;
+    }
+    .upload-button {
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="input-container">
+      <input type="file" id="fileInput" /> <!-- File input for selecting the image -->
+    </div>
+    <div id="imagePreview"></div> <!-- Image preview -->
+    <div id="imageSizes"></div> <!-- Display the original and resized image sizes -->
+    <button id="uploadButton" class="upload-button">Upload Image</button> <!-- Button to upload the image -->
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script> <!-- Import FileSaver.js library -->
+  <script>
+    // State variables to store image data and sizes
+    let selectedImage = null; // State variable for the selected image
+    let imagePreview = null; // State variable for image preview
+    let imageSize = null; // State variable for original image size
+    let resizedImageSize = null; // State variable for resized image size
+
+    // Function to handle image selection from file input
+    const handleImageChange = (event) => {
+      const file = event.target.files[0]; // Get the selected file from the input
+
+      const reader = new FileReader(); // Create a new FileReader object
+      reader.onload = () => {
+        imagePreview = reader.result; // Set the image preview to the base64 URL of the selected image
+        document.getElementById('imagePreview').innerHTML = `<img src="${imagePreview}" alt="Selected" class="image-preview" />`; // Display the image preview
+      };
+      reader.readAsDataURL(file); // Read the selected file as a data URL
+
+      selectedImage = file; // Set the selected image file
+      imageSize = file.size; // Set the size of the selected image
+      document.getElementById('imageSizes').innerHTML = `<p>Original Images Size : ${imageSize / 1024} KB</p>`; // Display the original image size
+    };
+
+    // Function to resize the selected image to specific dimensions
+    const resizeImage = (image, width, height) => {
+      return new Promise((resolve) => {
+        const img = new Image(); // Create a new Image object
+        img.onload = () => {
+          const canvas = document.createElement('canvas'); // Create a new canvas element
+          canvas.width = width; // Set the width of the canvas
+          canvas.height = height; // Set the height of the canvas
+
+          const ctx = canvas.getContext('2d'); // Get the 2D drawing context of the canvas
+          ctx.drawImage(img, 0, 0, width, height); // Draw the image on the canvas with the specified dimensions
+
+          canvas.toBlob((blob) => {
+            resolve({ blob, size: blob.size }); // Resolve the promise with the resized image blob and its size
+          }, 'image/jpeg', 0.9); // Convert the canvas to a JPEG blob with 90% quality
+        };
+        img.src = URL.createObjectURL(image); // Set the source of the image to the selected image
+      });
+    };
+
+    // Function to handle image upload using XMLHttpRequest
+    const uploadImageToDatabase = async (formData) => {
+      return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest(); // Create a new XMLHttpRequest object
+
+        xhr.open('POST', 'http://localhost:8888/api/DBDconn.php'); // Set the POST request endpoint
+
+        // Set the onload function to handle a successful request
+        xhr.onload = () => {
+          if (xhr.status === 200) {
+            resolve(xhr.responseText); // Resolve the promise with the response text
+          } else {
+            reject('Error uploading image to database'); // Reject the promise with an error message
+          }
+        };
+
+        // Set the onerror function to handle any errors during the request
+        xhr.onerror = () => {
+          reject('Error uploading image to database'); // Reject the promise with an error message
+        };
+
+        xhr.send(formData); // Send the FormData object with the image to the server
+      });
+    };
+
+    // Function to handle image upload
+    const handleImageUpload = async () => {
+      if (!selectedImage) {
+        alert('Please select an image'); // Display an alert if no image is selected
+        return;
+      }
+
+      try {
+        let resizedImage = selectedImage;
+
+        // Resize the image to the specific dimensions (2800x1500)
+        const result = await resizeImage(selectedImage, 2800, 1500); // Resize the image
+        resizedImage = result.blob; // Get the resized image blob
+        resizedImageSize = result.size; // Update the resized image size
+
+        // Check if the resized image size exceeds 1 MB
+        if (resizedImageSize > 1024 * 1024) {
+          alert('Resized image size exceeds 1 MB. Please select a smaller image.'); // Display an alert if the resized image size exceeds 1 MB
+          return;
+        }
+
+        const formData = new FormData(); // Create a new FormData object
+        formData.append('image', resizedImage); // Append the resized image to the FormData
+
+        // Send a POST request to upload the image to the server
+        const response = await uploadImageToDatabase(formData);
+
+        console.log('Image uploaded successfully:', response); // Log the successful upload response
+
+        saveAs(resizedImage, 'resized_image.jpg'); // Save the resized image as a file
+
+        document.getElementById('imageSizes').innerHTML += `<p>Uploaded Image Size: ${resizedImageSize / 1024} KB</p>`; // Display the uploaded image size
+
+      } catch (error) {
+        console.error('Error uploading image:', error); // Log any errors that occur during the upload process
+      }
+    };
+
+    // Event listener for file input change
+    document.getElementById('fileInput').addEventListener('change', handleImageChange);
+
+    // Event listener for upload button click
+    document.getElementById('uploadButton').addEventListener('click', handleImageUpload);
+  </script>
+</body>
+</html>
+
+
+
+
